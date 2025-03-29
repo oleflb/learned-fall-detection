@@ -6,7 +6,7 @@ from sklearn.metrics import classification_report
 import polars as pl
 import polars.selectors as ps
 
-from dataframe import load
+from learned_fall_detection.data_loading import load
 
 
 def split_dataframe(dataframe: pl.DataFrame) -> tuple[pl.DataFrame, pl.DataFrame]:

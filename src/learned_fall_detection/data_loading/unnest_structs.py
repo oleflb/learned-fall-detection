@@ -31,17 +31,3 @@ def unnest_column(data: pl.Series) -> pl.DataFrame | pl.Series:
         ),
         how="horizontal",
     )
-
-
-def load(path: str):
-    df = pl.read_parquet(path).with_columns(
-        (pl.col("time") - pl.col("time").min())
-        .over("robot_identifier", "match_identifier")
-        .dt.total_seconds()
-        .alias("time_in_game"),
-    )
-    struct_columns = [col for col, schema in df.schema.items() if schema == pl.Struct]
-    for column in struct_columns:
-        df.hstack(unnest_column(df[column]), in_place=True)
-        df.drop_in_place(column)
-    return df.rechunk()

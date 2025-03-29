@@ -1,13 +1,13 @@
 from pathlib import Path
 from typing import Any
 from mcap.reader import make_reader, McapReader
-import click
 import polars as pl
 from msgpack import unpackb
 from datetime import datetime
 from itertools import batched
 from tqdm import tqdm
 from scipy.spatial.transform import Rotation
+from .unnest_structs import unnest_column
 
 
 class Unwrapper:
@@ -110,12 +110,19 @@ def read_mcap(mcap_path: Path) -> pl.DataFrame:
     return dataframe
 
 
-@click.command()
-@click.argument("mcaps", nargs=-1)
-def main(mcaps: list[str]):
-    data = pl.concat((read_mcap(Path(mcap)) for mcap in tqdm(mcaps)), how="diagonal")
-    data.write_parquet("data.parquet")
+def convert_mcaps(mcaps: list[str]) -> pl.DataFrame:
+    return pl.concat((read_mcap(Path(mcap)) for mcap in tqdm(mcaps)), how="diagonal")
 
 
-if __name__ == "__main__":
-    main()
+def load(path: str):
+    df = pl.read_parquet(path).with_columns(
+        (pl.col("time") - pl.col("time").min())
+        .over("robot_identifier", "match_identifier")
+        .dt.total_seconds()
+        .alias("time_in_game"),
+    )
+    struct_columns = [col for col, schema in df.schema.items() if schema == pl.Struct]
+    for column in struct_columns:
+        df.hstack(unnest_column(df[column]), in_place=True)
+        df.drop_in_place(column)
+    return df.rechunk()
